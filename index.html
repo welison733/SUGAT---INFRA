@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Contratos - Controle de OS</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS/xlsx.js CDN for Excel export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            @apply bg-[#0D1117] text-gray-200;
+        }
+        .modal-content {
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .bg-custom-dark {
+            background-color: #161B22;
+        }
+        .text-custom-light {
+            color: #C9D1D9;
+        }
+        /* Sticky table header */
+        .sticky-header th {
+            position: sticky;
+            top: 0;
+            background-color: #161B22;
+            z-index: 10;
+        }
+        /* Make content in specific table cells wrap */
+        .whitespace-normal {
+            white-space: normal;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-12">
+
+    <!-- Login Container -->
+    <div id="loginContainer" class="flex flex-col items-center justify-center min-h-screen bg-custom-dark p-6 md:p-12">
+        <div class="max-w-md w-full bg-[#161B22] rounded-xl shadow-lg p-6 md:p-10 border border-[#21262D]">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Logotipo_da_Infra_SA.svg/2560px-Logotipo_da_Infra_SA.svg.png" alt="Logotipo Infra S.A." class="w-auto h-24 mx-auto mb-6">
+            <h1 class="text-3xl font-bold text-center text-custom-light mb-6">Acesso à Plataforma</h1>
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-400">Email</label>
+                    <input type="email" id="email" name="email" required class="mt-1 block w-full rounded-md border-[#30363D] bg-[#0D1117] text-custom-light shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-400">Senha</label>
+                    <input type="password" id="password" name="password" required class="mt-1 block w-full rounded-md border-[#30363D] bg-[#0D1117] text-custom-light shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                </div>
+                <div id="loginStatus" class="text-center text-sm font-medium text-red-400"></div>
+                <button type="submit" class="w-full bg-indigo-600 text-white p-2 rounded-lg shadow-md hover:bg-indigo-700 transition duration-200">Entrar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="mainContainer" class="max-w-full mx-auto bg-custom-dark rounded-xl shadow-lg p-6 md:p-10 border border-[#21262D] hidden">
+        <!-- Header -->
+        <header class="mb-8 md:mb-12 flex flex-col items-center space-y-4 md:space-y-0">
+            <div class="flex flex-col items-center">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Logotipo_da_Infra_SA.svg/2560px-Logotipo_da_Infra_SA.svg.png" alt="Logotipo Infra S.A." class="w-auto h-16 mb-4">
+                <h1 class="text-3xl md:text-4xl font-bold text-custom-light text-center">Gestão de Contratos - Controle de OS</h1>
+            </div>
+            <div class="flex flex-col md:flex-row items-center space-y-4 md:space-x-4 md:space-y-0 mt-8 md:mt-8">
+                <select id="monthSelector" class="p-2 border border-[#30363D] rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-200 bg-[#0D1117] text-custom-light">
+                    <!-- Options will be populated by JavaScript -->
+                </select>
+                <div class="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2">
+                    <button id="viewToggleBtn" class="bg-[#21262D] text-custom-light p-2 md:px-4 md:py-2 rounded-full md:rounded-lg shadow-md hover:bg-[#30363D] transition duration-200 flex items-center justify-center">
+                        Ver Gráficos
+                    </button>
+                    <button id="exportExcelBtn" class="bg-green-600 text-white p-2 md:px-4 md:py-2 rounded-full md:rounded-lg shadow-md hover:bg-green-700 transition duration-200 flex items-center justify-center">
+                        Baixar Excel
+                    </button>
+                    <button id="logoutBtn" class="bg-red-600 text-white p-2 md:px-4 md:py-2 rounded-full md:rounded-lg shadow-md hover:bg-red-700 transition duration-200 flex items-center justify-center">
+                        Sair
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <p id="userNameDisplay" class="text-xs text-gray-500 mb-4 truncate"></p>
+        <p id="userIdDisplay" class="text-xs text-gray-500 mb-4 truncate"></p>
+
+        <!-- Loading and Message Area -->
+        <div id="statusMessage" class="hidden p-4 mb-4 rounded-lg text-center font-medium"></div>
+        
+        <!-- Chart Container -->
+        <div id="chartContainer" class="bg-[#0D1117] p-6 rounded-lg shadow-inner mb-8 hidden border border-[#30363D]">
+            <h2 class="text-lg md:text-xl font-bold text-custom-light mb-4 text-center">Resumo de Quantitativos</h2>
+            <div class="relative h-64">
+                <canvas id="osChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Table Container -->
+        <div id="tableContainer" class="overflow-x-auto rounded-lg shadow-inner w-full flex-grow overflow-y-auto">
+            <table class="min-w-full divide-y divide-[#30363D]">
+                <thead class="bg-[#161B22] sticky-header">
+                    <tr>
+                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider hidden">Autor</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Instrumentos</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">OS</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Doc. Solicitação OS</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Produto</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Valor do Produto</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Qtd Autorizada</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Qtd Atualizada</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Qtd Executada</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Em Execução</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Saldo</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Saldo Total</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">valor pago</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Data de Inserção</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="dataTable" class="bg-[#0D1117] divide-y divide-[#30363D] text-custom-light">
+                    <!-- Table rows will be populated by JavaScript -->
+                    <tr>
+                        <td colspan="15" class="px-3 py-4 text-center text-gray-500">Nenhum dado encontrado para este mês.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="mt-8 flex justify-center">
+            <button id="addOsBtn" class="bg-indigo-600 text-white p-2 md:px-4 md:py-2 rounded-full md:rounded-lg shadow-md hover:bg-indigo-700 transition duration-200 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                <span class="ml-2 hidden md:block">Adicionar OS</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal for Adding/Editing OS -->
+    <div id="osModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+        <div class="relative bg-[#161B22] rounded-lg shadow-xl max-w-lg w-full p-6 md:p-8 modal-content border border-[#30363D]">
+            <div class="flex justify-between items-center mb-6">
+                <h3 id="modalTitle" class="text-xl md:text-2xl font-bold text-custom-light">Adicionar Nova OS</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 transition duration-200">&times;</button>
+            </div>
+            <form id="osForm" onsubmit="handleFormSubmit(event)">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="instrumentos" class="block text-sm font-medium text-gray-400">Instrumentos</label>
+                        <select id="instrumentos" name="instrumentos" required class="mt-1 block w-full rounded-md border-[#30363D] bg-[#0D1117] text-custom-light shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                            <!-- Options will be populated by JavaScript -->
+                        </select>
+                    </div>
+                    <div>
+                        <label for="os" class="block text-sm font-medium text-gray-400">OS</label>
+                        <input type="text" id="os" name="os" required class="mt-1 block w-full rounded-md border-[#30363D] bg-[#0D1117] text-custom-light shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                    </div>
+                    <div>
+                        <label for="docSolicitacao" class="block text-sm font-medium text-gray-400">Doc. Solicitação OS</label>
+                        <input type="text" id="docSolicitacao" name="docSolicitacao" required class="mt-1 block w-full rounded-md border-[#30363D] bg-[#0D1117] text-custom-light shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                    </div>
+                    <div>
+                        <label for="produto" class="block text-sm font-medium text-gray-400">Produto</label>
+                        <input type="text" id="produto" name="produto" required class="mt-1 block w-full rounded-md border-[#30363D] bg-[#0D1117] text-custom-light shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                    </div>
+                    <div>
+                        <label for="valorProduto" class="block text-sm font-medium text-gray-400">Valor do Produto</label>
+                        <input type="number" id="valorProduto" name="valorProduto" step="0.01" required class="mt-1 block w-full rounded-md border-[#30363D] bg-[#0D1117] text-custom-light shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                    </div>
+                    <div>
+                        <label for="qtdAutorizada" class="block text-sm font-medium text-gray-400">Quantidade Autorizada</label>
+                        <input type="number" id="qtdAutorizada" name="qtdAutorizada" required class="mt-1 block w-full rounded-md border-[#30363D] bg-[#0D1117] text-custom-light shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                    </div>
+                    <div>
+                        <label for="qtdAtualizada" class="block text-sm font-medium text-gray-400">Quantidade Atualizada</label>
+                        <input type="number" id="qtdAtualizada" name="qtdAtualizada" required class="mt-1 block w-full rounded-md border-[#30363D] bg-[#0D1117] text-custom-light shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                    </div>
+                    <div>
+                        <label for="qtdExecutada" class="block text-sm font-medium text-gray-400">Qtd Executada</label>
+                        <input type="number" id="qtdExecutada" name="qtdExecutada" required class="mt-1 block w-full rounded-md border-[#30363D] bg-[#0D1117] text-custom-light shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                    </div>
+                    <div>
+                        <label for="emExecucao" class="block text-sm font-medium text-gray-400">Em Execução</label>
+                        <input type="number" id="emExecucao" name="emExecucao" class="mt-1 block w-full rounded-md border-[#30363D] bg-[#0D1117] text-custom-light shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                    </div>
+                    <div>
+                        <label for="saldo" class="block text-sm font-medium text-gray-400">Saldo</label>
+                        <input type="number" id="saldo" name="saldo" readonly class="mt-1 block w-full rounded-md border-[#30363D] bg-[#0D1117] text-custom-light shadow-sm focus:outline-none p-2">
+                    </div>
+                    <div>
+                        <label for="saldoTotal" class="block text-sm font-medium text-gray-400">Saldo Total</label>
+                        <input type="number" id="saldoTotal" name="saldoTotal" step="0.01" readonly class="mt-1 block w-full rounded-md border-[#30363D] bg-[#0D1117] text-custom-light shadow-sm focus:outline-none p-2">
+                    </div>
+                    <div>
+                        <label for="pagoValor" class="block text-sm font-medium text-gray-400">valor pago</label>
+                        <input type="number" id="pagoValor" name="pagoValor" step="0.01" readonly class="mt-1 block w-full rounded-md border-[#30363D] bg-[#0D1117] text-custom-light shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end space-x-4">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 bg-[#21262D] text-custom-light rounded-lg hover:bg-[#30363D] transition duration-200">Cancelar</button>
+                    <button type="submit" id="saveBtn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition duration-200">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Custom Confirmation Modal -->
+    <div id="confirmModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+        <div class="relative bg-[#161B22] rounded-lg shadow-xl max-w-sm w-full p-6 text-center border border-[#30363D]">
+            <p id="confirmMessage" class="text-lg font-semibold text-custom-light mb-6">Tem certeza que deseja excluir esta OS?</p>
+            <div class="flex justify-center space-x-4">
+                <button id="cancelConfirmBtn" class="px-4 py-2 bg-[#21262D] text-custom-light rounded-lg hover:bg-[#30363D] transition duration-200">Cancelar</button>
+                <button id="confirmDeleteBtn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition duration-200">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Password Change Modal -->
+    <div id="passwordModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+        <div class="relative bg-[#161B22] rounded-lg shadow-xl max-w-md w-full p-6 md:p-8 modal-content border border-[#30363D]">
+            <h3 class="text-xl md:text-2xl font-bold text-custom-light text-center mb-4">Atualize sua senha</h3>
+            <p class="text-sm text-gray-400 text-center mb-6">Por favor, crie uma nova senha para acessar a plataforma.</p>
+            <form id="passwordForm" class="space-y-4">
+                <div>
+                    <label for="newPassword" class="block text-sm font-medium text-gray-400">Nova Senha</label>
+                    <input type="password" id="newPassword" name="newPassword" required class="mt-1 block w-full rounded-md border-[#30363D] bg-[#0D1117] text-custom-light shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                </div>
+                <div>
+                    <label for="confirmNewPassword" class="block text-sm font-medium text-gray-400">Confirmar Nova Senha</label>
+                    <input type="password" id="confirmNewPassword" name="confirmNewPassword" required class="mt-1 block w-full rounded-md border-[#30363D] bg-[#0D1117] text-custom-light shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                </div>
+                <div id="passwordStatus" class="text-center text-sm font-medium text-red-400"></div>
+                <button type="submit" class="w-full bg-indigo-600 text-white p-2 rounded-lg shadow-md hover:bg-indigo-700 transition duration-200">Atualizar Senha</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firebase Scripts -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, updatePassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, getDocs, collection, query, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Set Firebase log level for debugging
+        setLogLevel('debug');
+
+        // ⚠️ ATENÇÃO: SUBSTITUA AS CREDENCIAIS ABAIXO PELAS SUAS, OBTIDAS DO CONSOLE DO FIREBASE. ⚠️
+        const firebaseConfig = {
+  apiKey: "AIzaSyAJQymApJMx_Cm4cWFdLK21VSnYDVGgjeg",
+  authDomain: "cadastro-cursos.firebaseapp.com",
+  projectId: "cadastro-cursos",
+  storageBucket: "cadastro-cursos.firebasestorage.app",
+  messagingSenderId: "1002119066380",
+  appId: "1:1002119066380:web:8ff4476d932b30eb2d4f29",
+  measurementId: "G-VLKK4M3GLH"
+};
+        // ⚠️ FIM DA SEÇÃO DAS SUAS CREDENCIAIS DO FIREBASE. ⚠️
+
+        const appId = firebaseConfig.appId;
+
+        let db;
+        let auth;
+        let currentOSData = [];
+        let currentMonthDocId;
+        let isEditing = false;
+        let editingIndex = -1;
+        let userId;
+
+        // UI elements
+        const loginContainer = document.getElementById('loginContainer');
+        const loginForm = document.getElementById('loginForm');
+        const loginStatus = document.getElementById('loginStatus');
+        const mainContainer = document.getElementById('mainContainer');
+        const userNameDisplay = document.getElementById('userNameDisplay');
+        const userIdDisplay = document.getElementById('userIdDisplay');
+        const monthSelector = document.getElementById('monthSelector');
+        const dataTable = document.getElementById('dataTable');
+        const addOsBtn = document.getElementById('addOsBtn');
+        const osModal = document.getElementById('osModal');
+        const osForm = document.getElementById('osForm');
+        const statusMessage = document.getElementById('statusMessage');
+        const confirmModal = document.getElementById('confirmModal');
+        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+        const cancelConfirmBtn = document.getElementById('cancelConfirmBtn');
+        const viewToggleBtn = document.getElementById('viewToggleBtn');
+        const chartContainer = document.getElementById('chartContainer');
+        const tableContainer = document.getElementById('tableContainer');
+        const exportExcelBtn = document.getElementById('exportExcelBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        
+        // Chart elements
+        let osChartInstance;
+
+        // Form elements for auto-calculation
+        const qtdAtualizadaInput = document.getElementById('qtdAtualizada');
+        const valorProdutoInput = document.getElementById('valorProduto');
+        const saldoTotalInput = document.getElementById('saldoTotal');
+        const qtdExecutadaInput = document.getElementById('qtdExecutada');
+        const emExecucaoInput = document.getElementById('emExecucao');
+        const saldoInput = document.getElementById('saldo');
+        const pagoValorInput = document.getElementById('pagoValor');
+        const instrumentosInput = document.getElementById('instrumentos');
+        const passwordModal = document.getElementById('passwordModal');
+        const passwordForm = document.getElementById('passwordForm');
+        const passwordStatus = document.getElementById('passwordStatus');
+        
+        // List of instruments to be sorted
+        const instrumentosList = [
+            '032/2013', '016/2015', '017/2015', '011/2018', '762/2020', '009/2021',
+            '014/2021', '016/2021', '017/2021', '020/2021', '025/2021', '012/2022',
+            '013/2022', '021/2024', '037/2024', '006/2025', '007/2025', '010/2025',
+            'Inex 012/2025', '017/2025', '026/2025', '027/2025', '029/2025'
+        ].sort();
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        
+        // Listen for auth state changes
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // User is signed in, show main UI
+                loginContainer.classList.add('hidden');
+                mainContainer.classList.remove('hidden');
+                
+                const email = user.email;
+                const firstName = email.substring(0, email.indexOf('.'));
+                const capitalizedFirstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+                userNameDisplay.textContent = `Olá, ${capitalizedFirstName}!`;
+                userIdDisplay.textContent = `ID do Usuário: ${user.uid}`;
+                userId = user.uid;
+
+                initializePlatform();
+
+            } else {
+                // User is signed out, show login UI
+                loginContainer.classList.remove('hidden');
+                mainContainer.classList.add('hidden');
+            }
+        });
+        
+        // Handle login form submission
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = loginForm.email.value;
+            const password = loginForm.password.value;
+            loginStatus.textContent = '';
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (error) {
+                loginStatus.textContent = `Erro no login: ${error.message}`;
+                console.error("Login error:", error);
+            }
+        });
+
+        // Handle logout
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+            } catch (error) {
+                console.error("Logout error:", error);
+            }
+        });
+
+        // Main initialization function
+        async function initializePlatform() {
+            try {
+                populateInstrumentosSelect();
+                await populateMonthSelector();
+                
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = (now.getMonth() + 1).toString().padStart(2, '0');
+                const defaultMonthId = `${year}-${month}`;
+
+                if (!Array.from(monthSelector.options).some(option => option.value === defaultMonthId)) {
+                    const option = document.createElement('option');
+                    option.value = defaultMonthId;
+                    option.textContent = formatMonthId(defaultMonthId);
+                    monthSelector.prepend(option);
+                }
+                monthSelector.value = defaultMonthId;
+                
+                monthSelector.addEventListener('change', fetchOSData);
+                viewToggleBtn.addEventListener('click', toggleView);
+                exportExcelBtn.addEventListener('click', exportToExcel);
+                
+                await fetchOSData();
+
+            } catch (error) {
+                console.error("Erro ao inicializar a plataforma:", error);
+                showMessage('Erro ao carregar a plataforma. Tente novamente mais tarde.', 'error');
+            }
+        }
+        
+        // Populates the instrumentos select with the sorted list
+        function populateInstrumentosSelect() {
+            instrumentosInput.innerHTML = '';
+            instrumentosList.forEach(instrumento => {
+                const option = document.createElement('option');
+                option.value = instrumento;
+                option.textContent = instrumento;
+                instrumentosInput.appendChild(option);
+            });
+        }
+
+        // Populates the month selector with existing months from Firestore
+        async function populateMonthSelector() {
+            try {
+                const collectionPath = `/artifacts/${appId}/public/data/ordens_de_servico`;
+                const q = query(collection(db, collectionPath));
+                const querySnapshot = await getDocs(q);
+
+                const existingMonths = new Set();
+                querySnapshot.forEach((doc) => {
+                    existingMonths.add(doc.id);
+                });
+
+                monthSelector.innerHTML = '';
+                
+                const sortedMonths = Array.from(existingMonths).sort().reverse();
+                sortedMonths.forEach(monthId => {
+                    const option = document.createElement('option');
+                    option.value = monthId;
+                    option.textContent = formatMonthId(monthId);
+                    monthSelector.appendChild(option);
+                });
+            } catch (error) {
+                console.error("Erro ao popular o seletor de meses:", error);
+                showMessage('Erro de permissão ao carregar meses. Por favor, recarregue a página.', 'error');
+            }
+        }
+
+        // Formats a YYYY-MM string to a readable format
+        function formatMonthId(monthId) {
+            const [year, month] = monthId.split('-');
+            const date = new Date(year, month - 1);
+            return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+        }
+
+        // Fetches and listens for real-time updates for the selected month's data
+        let unsubscribe;
+        async function fetchOSData() {
+            if (unsubscribe) {
+                unsubscribe();
+            }
+
+            const selectedMonth = monthSelector.value;
+            currentMonthDocId = selectedMonth;
+            const docRef = doc(db, `/artifacts/${appId}/public/data/ordens_de_servico`, selectedMonth);
+
+            unsubscribe = onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    currentOSData = docSnap.data().ordens || [];
+                    renderTable(currentOSData);
+                    renderChart(currentOSData);
+                } else {
+                    currentOSData = [];
+                    renderTable([]);
+                    renderChart([]);
+                }
+            }, (error) => {
+                console.error("Erro ao obter dados em tempo real:", error);
+                showMessage('Erro ao carregar dados. Tente novamente.', 'error');
+            });
+        }
+
+        // Renders the data in the table
+        function renderTable(data) {
+            dataTable.innerHTML = '';
+
+            if (data.length === 0) {
+                dataTable.innerHTML = `<tr><td colspan="15" class="px-3 py-4 text-center text-gray-500">Nenhum dado encontrado para este mês.</td></tr>`;
+                return;
+            }
+
+            data.forEach((item, index) => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-[#30363D] transition-colors duration-200 text-custom-light';
+                row.innerHTML = `
+                    <td class="px-3 py-4 text-sm whitespace-nowrap hidden">${item.autor || 'N/A'}</td>
+                    <td class="px-3 py-4 text-sm whitespace-normal">${item.instrumentos}</td>
+                    <td class="px-3 py-4 text-sm whitespace-normal">${item.os}</td>
+                    <td class="px-3 py-4 text-sm whitespace-normal">${item.docSolicitacao}</td>
+                    <td class="px-3 py-4 text-sm whitespace-normal">${item.produto}</td>
+                    <td class="px-3 py-4 text-sm whitespace-normal">R$ ${formatCurrency(item.valorProduto)}</td>
+                    <td class="px-3 py-4 text-sm whitespace-normal">${item.qtdAutorizada}</td>
+                    <td class="px-3 py-4 text-sm whitespace-normal">${item.qtdAtualizada}</td>
+                    <td class="px-3 py-4 text-sm whitespace-normal">${item.qtdExecutada}</td>
+                    <td class="px-3 py-4 text-sm whitespace-normal">${item.emExecucao}</td>
+                    <td class="px-3 py-4 text-sm whitespace-normal">${item.saldo}</td>
+                    <td class="px-3 py-4 text-sm whitespace-normal">R$ ${formatCurrency(item.saldoTotal)}</td>
+                    <td class="px-3 py-4 text-sm whitespace-normal">R$ ${formatCurrency(item.pagoValor)}</td>
+                    <td class="px-3 py-4 text-sm whitespace-normal">${new Date(item.dataCriacao).toLocaleString('pt-BR')}</td>
+                    <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <button onclick="openModalForEdit(${index})" class="text-indigo-400 hover:text-indigo-300 transition duration-200">Editar</button>
+                        <span class="text-gray-600">|</span>
+                        <button onclick="showDeleteConfirmModal(${index})" class="text-red-400 hover:text-red-300 transition duration-200">Excluir</button>
+                    </td>
+                `;
+                dataTable.appendChild(row);
+            });
+        }
+
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+        }
+
+        function showMessage(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800');
+            if (type === 'success') {
+                statusMessage.classList.add('bg-green-100', 'text-green-800');
+            } else if (type === 'error') {
+                statusMessage.classList.add('bg-red-100', 'text-red-800');
+            }
+        }
+
+        function hideMessage() {
+            statusMessage.classList.add('hidden');
+        }
+
+        function openModal() {
+            osModal.classList.remove('hidden');
+        }
+
+        window.closeModal = () => {
+            osModal.classList.add('hidden');
+            osForm.reset();
+            isEditing = false;
+            editingIndex = -1;
+            document.getElementById('modalTitle').textContent = 'Adicionar Nova OS';
+            document.getElementById('saveBtn').textContent = 'Salvar';
+        }
+
+        window.openModalForEdit = (index) => {
+            const item = currentOSData[index];
+            if (!item) return;
+
+            isEditing = true;
+            editingIndex = index;
+            document.getElementById('modalTitle').textContent = 'Editar OS';
+            document.getElementById('saveBtn').textContent = 'Atualizar';
+
+            instrumentosInput.value = item.instrumentos;
+            document.getElementById('os').value = item.os;
+            document.getElementById('docSolicitacao').value = item.docSolicitacao;
+            document.getElementById('produto').value = item.produto;
+            document.getElementById('valorProduto').value = item.valorProduto;
+            document.getElementById('qtdAutorizada').value = item.qtdAutorizada;
+            document.getElementById('qtdAtualizada').value = item.qtdAtualizada;
+            document.getElementById('qtdExecutada').value = item.qtdExecutada;
+            document.getElementById('emExecucao').value = item.emExecucao;
+            document.getElementById('saldo').value = item.saldo;
+            document.getElementById('saldoTotal').value = item.saldoTotal;
+            document.getElementById('pagoValor').value = item.pagoValor;
+
+            openModal();
+        };
+
+        // Live calculation for Saldo
+        const calculateSaldo = () => {
+            const qtdAtualizada = Number(qtdAtualizadaInput.value) || 0;
+            const qtdExecutada = Number(qtdExecutadaInput.value) || 0;
+            const emExecucao = Number(emExecucaoInput.value) || 0;
+            saldoInput.value = (qtdAtualizada - qtdExecutada - emExecucao);
+        };
+        qtdAtualizadaInput.addEventListener('input', calculateSaldo);
+        qtdExecutadaInput.addEventListener('input', calculateSaldo);
+        emExecucaoInput.addEventListener('input', calculateSaldo);
+
+        // Live calculation for Saldo Total
+        const calculateSaldoTotal = () => {
+            const qtdAtualizada = Number(qtdAtualizadaInput.value) || 0;
+            const valorProduto = Number(valorProdutoInput.value) || 0;
+            saldoTotalInput.value = (qtdAtualizada * valorProduto).toFixed(2);
+        };
+        qtdAtualizadaInput.addEventListener('input', calculateSaldoTotal);
+        valorProdutoInput.addEventListener('input', calculateSaldoTotal);
+
+        // Live calculation for Pago Valor
+        const calculatePagoValor = () => {
+            const qtdExecutada = Number(qtdExecutadaInput.value) || 0;
+            const valorProduto = Number(valorProdutoInput.value) || 0;
+            
+            pagoValorInput.value = (qtdExecutada * valorProduto).toFixed(2);
+        };
+        qtdExecutadaInput.addEventListener('input', calculatePagoValor);
+        valorProdutoInput.addEventListener('input', calculatePagoValor);
+
+
+        window.handleFormSubmit = async (event) => {
+            event.preventDefault();
+            hideMessage();
+
+            const formData = new FormData(osForm);
+            const qtdAtualizada = Number(formData.get('qtdAtualizada'));
+            const valorProduto = Number(formData.get('valorProduto'));
+            const qtdExecutada = Number(formData.get('qtdExecutada'));
+            const emExecucao = Number(formData.get('emExecucao'));
+            
+            const newItem = {
+                autor: auth.currentUser.email,
+                instrumentos: formData.get('instrumentos'),
+                os: formData.get('os'),
+                docSolicitacao: formData.get('docSolicitacao'),
+                produto: formData.get('produto'),
+                qtdAutorizada: Number(formData.get('qtdAutorizada')),
+                qtdAtualizada: qtdAtualizada,
+                valorProduto: valorProduto,
+                qtdExecutada: qtdExecutada,
+                emExecucao: emExecucao,
+                saldo: Number(saldoInput.value),
+                saldoTotal: Number(saldoTotalInput.value),
+                pagoValor: Number(pagoValorInput.value),
+                dataCriacao: new Date().toISOString()
+            };
+
+            const docRef = doc(db, `/artifacts/${appId}/public/data/ordens_de_servico`, currentMonthDocId);
+
+            try {
+                if (isEditing) {
+                    const updatedData = [...currentOSData];
+                    updatedData[editingIndex] = newItem;
+                    await setDoc(docRef, { ordens: updatedData });
+                    showMessage('OS atualizada com sucesso!', 'success');
+                } else {
+                    const newData = [...currentOSData, newItem];
+                    await setDoc(docRef, { ordens: newData });
+                    showMessage('Nova OS adicionada com sucesso!', 'success');
+                }
+                closeModal();
+            } catch (e) {
+                console.error("Erro ao salvar dados:", e);
+                showMessage('Erro ao salvar os dados. Por favor, tente novamente.', 'error');
+            }
+        };
+        
+        let itemToDeleteIndex = -1;
+
+        window.showDeleteConfirmModal = (index) => {
+            itemToDeleteIndex = index;
+            confirmModal.classList.remove('hidden');
+        };
+
+        window.hideDeleteConfirmModal = () => {
+            confirmModal.classList.add('hidden');
+            itemToDeleteIndex = -1;
+        };
+
+        confirmDeleteBtn.addEventListener('click', async () => {
+            await deleteOS(itemToDeleteIndex);
+            hideDeleteConfirmModal();
+        });
+
+        cancelConfirmBtn.addEventListener('click', () => {
+            hideDeleteConfirmModal();
+        });
+
+        async function deleteOS(index) {
+            hideMessage();
+            const docRef = doc(db, `/artifacts/${appId}/public/data/ordens_de_servico`, currentMonthDocId);
+            const updatedData = currentOSData.filter((_, i) => i !== index);
+
+            // Save the deleted item's author and timestamp
+            const deletedItem = currentOSData[index];
+            const deletionRecord = {
+                autor: auth.currentUser.email,
+                dataExclusao: new Date().toISOString(),
+                itemExcluido: deletedItem
+            };
+            const deletedDocRef = doc(db, `/artifacts/${appId}/public/data/exclusoes`, `${currentMonthDocId}-${Date.now()}`);
+            await setDoc(deletedDocRef, deletionRecord);
+
+
+            try {
+                await setDoc(docRef, { ordens: updatedData });
+                showMessage('OS excluída com sucesso!', 'success');
+            } catch (e) {
+                console.error("Erro ao excluir OS:", e);
+                showMessage('Erro ao excluir a OS. Por favor, tente novamente.', 'error');
+            }
+        };
+
+        addOsBtn.addEventListener('click', () => {
+            closeModal();
+            osForm.reset();
+            openModal();
+        });
+        
+        // Function to toggle between chart and table view
+        function toggleView() {
+            if (chartContainer.classList.contains('hidden')) {
+                chartContainer.classList.remove('hidden');
+                tableContainer.classList.add('hidden');
+                viewToggleBtn.textContent = 'Ver Tabela';
+            } else {
+                chartContainer.classList.add('hidden');
+                tableContainer.classList.remove('hidden');
+                viewToggleBtn.textContent = 'Ver Gráficos';
+            }
+        }
+
+        // Function to render the chart
+        function renderChart(data) {
+            const labels = ['Qtd. Autorizada', 'Qtd. Atualizada', 'Qtd. Executada', 'Em Execução'];
+            
+            const totalQtdAutorizada = data.reduce((sum, item) => sum + (Number(item.qtdAutorizada) || 0), 0);
+            const totalQtdAtualizada = data.reduce((sum, item) => sum + (Number(item.qtdAtualizada) || 0), 0);
+            const totalQtdExecutada = data.reduce((sum, item) => sum + (Number(item.qtdExecutada) || 0), 0);
+            const totalEmExecucao = data.reduce((sum, item) => sum + (Number(item.emExecucao) || 0), 0);
+            
+            const chartData = [totalQtdAutorizada, totalQtdAtualizada, totalQtdExecutada, totalEmExecucao];
+
+            const chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Quantitativos do Mês',
+                        data: chartData,
+                        backgroundColor: [
+                            'rgba(75, 192, 192, 0.6)',
+                            'rgba(153, 102, 255, 0.6)',
+                            'rgba(255, 159, 64, 0.6)',
+                            'rgba(255, 99, 132, 0.6)'
+                        ],
+                        borderColor: [
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(153, 102, 255, 1)',
+                            'rgba(255, 159, 64, 1)',
+                            'rgba(255, 99, 132, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        title: {
+                            display: true,
+                            text: 'Resumo Quantitativo Mensal'
+                        }
+                    }
+                }
+            };
+            
+            const chartCanvas = document.getElementById('osChart');
+            if (osChartInstance) {
+                osChartInstance.destroy();
+            }
+            osChartInstance = new Chart(chartCanvas, chartConfig);
+        }
+
+        // Function to export table data to Excel (.xlsx)
+        function exportToExcel() {
+            if (currentOSData.length === 0) {
+                showMessage('Não há dados para exportar.', 'error');
+                return;
+            }
+
+            const header = [
+                "Autor", "Instrumentos", "OS", "Doc. Solicitação OS", "Produto", "Valor do Produto",
+                "Qtd Autorizada", "Qtd Atualizada", "Qtd Executada", "Em Execução",
+                "Saldo", "Saldo Total", "valor pago", "Data de Inserção"
+            ];
+
+            const dataToExport = [header];
+            currentOSData.forEach(item => {
+                dataToExport.push([
+                    item.autor || 'N/A',
+                    item.instrumentos,
+                    item.os,
+                    item.docSolicitacao,
+                    item.produto,
+                    item.valorProduto,
+                    item.qtdAutorizada,
+                    item.qtdAtualizada,
+                    item.qtdExecutada,
+                    item.emExecucao,
+                    item.saldo,
+                    item.saldoTotal,
+                    item.pagoValor,
+                    new Date(item.dataCriacao).toLocaleString('pt-BR')
+                ]);
+            });
+
+            const worksheet = XLSX.utils.aoa_to_sheet(dataToExport);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Dados");
+
+            const monthName = formatMonthId(currentMonthDocId).replace(/\s/g, '_');
+            XLSX.writeFile(workbook, `OS_${monthName}.xlsx`);
+        }
+    </script>
+    <!-- End Firebase Scripts -->
+</body>
+</html>
